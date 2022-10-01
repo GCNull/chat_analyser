@@ -119,9 +119,7 @@ impl eframe::App for ChatAnalyser {
 
         if self.is_exiting {
             frame.close();
-            if let Err(e) = config::MainWindowConfig::save_window_to_json(frame.info().window_info) {
-                log::error!("Failed to save window data to config file: {}", e);
-            }
+            config::MainWindowConfig::save_window_to_json(frame.info().window_info);
             self.can_exit = true;
         }
         ctx.request_repaint();

@@ -1,7 +1,7 @@
 use std::fs::{create_dir_all, File, OpenOptions, read_dir, read_to_string};
-use std::io::BufReader;
+use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 
-use anyhow::Error;
+use anyhow::{anyhow, Error};
 use once_cell::sync::Lazy;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
@@ -58,7 +58,7 @@ impl Default for ConfigFile {
         };
         match OpenOptions::new().create(true).write(true).truncate(true).open(format!("{}config.json", *WORKING_DIR)) {
             Ok(default_conf_file) => {
-                if let Err(e) = serde_json::to_writer(default_conf_file, &default) {
+                if let Err(e) = serde_json::to_writer_pretty(default_conf_file, &default) {
                     panic!("Failed to create config file: {:?}", e);
                 } else { log::info!("Created init config file at {}config.json", *WORKING_DIR); }
             }
@@ -70,7 +70,6 @@ impl Default for ConfigFile {
     }
 }
 
-// TODO vector of tabs for each channel
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MainWindowConfig {
     pub window_width: f32,
@@ -100,13 +99,13 @@ impl MainWindowConfig {
         }
     }
 
-    pub fn save_window_to_json(window: eframe::WindowInfo) -> Result<()> {
+    pub fn save_window_to_json(window: eframe::WindowInfo) {
         log::trace!("{:#?}", window);
 
-        return match File::open(format!("{}config.json", *WORKING_DIR)) {
-            Ok(file) => {
-                let reader = BufReader::new(file);
-                return match serde_json::from_reader(reader) {
+        // Read config file into memery
+        match read_to_string(format!("{}config.json", *WORKING_DIR)) {
+            Ok(data) => {
+                match serde_json::from_str(&data) {
                     Ok(file2) => {
                         let file2: Value = file2;
                         let mut i = file2.as_object().unwrap().clone();
@@ -115,14 +114,21 @@ impl MainWindowConfig {
                         *i["main_win_config"].get_mut("window_position_x").unwrap() = Value::from(window.position.unwrap().x);
                         *i["main_win_config"].get_mut("window_position_y").unwrap() = Value::from(window.position.unwrap().y);
 
-                        // file.
-                        Ok(())
+                        // Once config file is parsed and new values are written (in memory), wipe the file clean and then write onto disk
+                        match OpenOptions::new().read(true).create(true).write(true).append(false).truncate(true).open(format!("{}config.json", *WORKING_DIR)) {
+                            Ok(file) => {
+                                if let Err(e) = serde_json::to_writer_pretty(file, &i) {
+                                    log::error!("{:?}", e);
+                                }
+                            }
+                            Err(e) => log::error!("Failed to write window data to config: {}", e),
+                        }
                     }
-                    Err(e) => Err(Error::new(e))
-                };
+                    Err(e) => log::error!("Failed to parse config file: {}", e),
+                }
             }
-            Err(e) => Err(Error::new(e))
-        };
+            Err(e) => log::error!("Failed to write window data to config: {}", e),
+        }
     }
 }
 
