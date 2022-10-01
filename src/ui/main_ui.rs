@@ -25,7 +25,6 @@ pub struct ChatAnalyser {
 
 impl ChatAnalyser {
     pub fn init(self, _rt_handle: Handle, config_file: ConfigFile, cc: &eframe::CreationContext<'_>) -> Self {
-        dbg!(&config_file);
         if config_file.main_win_config.dark_mode {
             cc.egui_ctx.set_visuals(egui::Visuals::dark());
         } else {
@@ -55,8 +54,10 @@ impl ChatAnalyser {
                     }
 
                     if add_channel_button.clicked() {
-                        egui::Window::new("Join a channel").collapsible(false).resizable(false).auto_sized().show(ctx, |_ui| {
-                            _ui.colored_label(Color32::RED, "POGG")
+                        egui::Window::new("Join a channel").collapsible(false).resizable(false).auto_sized().show(ctx, |ui| {
+                            ui.colored_label(Color32::RED, "WORD");
+                            let input = ctx.input().clone();
+                            input.ui(ui);
                         });
                     }
                     if add_channel_button.hovered() {
@@ -65,14 +66,8 @@ impl ChatAnalyser {
                 });
             });
         });
-
-        egui::TopBottomPanel::bottom("footer").resizable(false).show(ctx, |ui| {
-            ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::TopDown), |ui| {
-                ui.hyperlink_to("Github", "https://github.com/GCNull/chat_analyser");
-            });
-        });
     }
-    fn render_t(&mut self, ctx: &Context) {
+    fn render_main(&mut self, ctx: &Context) {
         egui::SidePanel::left("Info").resizable(true).show(ctx, |ui| {
             let mut buff = String::new();
             let inp = egui::TextEdit::singleline(&mut buff).hint_text("TEST");
@@ -84,9 +79,17 @@ impl ChatAnalyser {
                 log::debug!("Sent");
                 r.request_focus();
             }
-
         });
+
         egui::CentralPanel::default().show(ctx, |_ui| {});
+    }
+
+    fn render_footer(&mut self, ctx: &Context) {
+        egui::TopBottomPanel::bottom("footer").resizable(false).show(ctx, |ui| {
+            ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::TopDown), |ui| {
+                ui.hyperlink_to(egui::special_emojis::GITHUB.to_string(), "https://github.com/GCNull/chat_analyser");
+            });
+        });
     }
 }
 
@@ -115,14 +118,15 @@ impl eframe::App for ChatAnalyser {
         }
 
         self.render_tabs_header(&ctx);
-        self.render_t(&ctx);
+        self.render_main(&ctx);
+        self.render_footer(&ctx);
 
         if self.is_exiting {
             frame.close();
             config::MainWindowConfig::save_window_to_json(frame.info().window_info);
             self.can_exit = true;
         }
-        ctx.request_repaint();
+        // ctx.request_repaint();
     }
 
     fn on_close_event(&mut self) -> bool {

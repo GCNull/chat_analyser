@@ -100,8 +100,6 @@ impl MainWindowConfig {
     }
 
     pub fn save_window_to_json(window: eframe::WindowInfo) {
-        log::trace!("{:#?}", window);
-
         // Read config file into memery
         match read_to_string(format!("{}config.json", *WORKING_DIR)) {
             Ok(data) => {
@@ -119,6 +117,8 @@ impl MainWindowConfig {
                             Ok(file) => {
                                 if let Err(e) = serde_json::to_writer_pretty(file, &i) {
                                     log::error!("{:?}", e);
+                                } else {
+                                    log::info!("Saved window state")
                                 }
                             }
                             Err(e) => log::error!("Failed to write window data to config: {}", e),
