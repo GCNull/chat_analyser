@@ -36,7 +36,7 @@ impl ConfigFile {
     }
 
     pub fn create_folders() {
-        for i in ["cache"] {
+        for i in ["cache", "logs"] {
             log::debug!("Checking for {} folder", i);
             let path = format!("{}{}", *WORKING_DIR, i);
             if let Err(e) = read_dir(&path) {
@@ -99,7 +99,7 @@ impl MainWindowConfig {
         }
     }
 
-    pub fn save_window_to_json(window: eframe::WindowInfo) {
+    pub fn save_window_to_json(window: eframe::WindowInfo, dark_mode: bool) {
         // Read config file into memery
         match read_to_string(format!("{}config.json", *WORKING_DIR)) {
             Ok(data) => {
@@ -107,6 +107,7 @@ impl MainWindowConfig {
                     Ok(file2) => {
                         let file2: Value = file2;
                         let mut i = file2.as_object().unwrap().clone();
+                        *i["main_win_config"].get_mut("dark_mode").unwrap() = Value::from(dark_mode);
                         *i["main_win_config"].get_mut("window_width").unwrap() = Value::from(window.size.x);
                         *i["main_win_config"].get_mut("window_height").unwrap() = Value::from(window.size.y);
                         *i["main_win_config"].get_mut("window_position_x").unwrap() = Value::from(window.position.unwrap().x);
