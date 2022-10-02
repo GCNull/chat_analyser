@@ -3,7 +3,6 @@
 #![allow(dead_code)]
 
 use std::env;
-use std::fs::OpenOptions;
 use std::io::Write;
 
 use anyhow::Error;
@@ -12,7 +11,6 @@ use egui::vec2;
 use env_logger::{Builder as env_builder, fmt::Color, WriteStyle};
 use log::{Level, LevelFilter};
 use tokio::runtime::Builder;
-use tokio::sync::broadcast::Sender;
 use crate::ui::main_ui::ChatAnalyser;
 
 mod config;
@@ -73,7 +71,7 @@ fn main() -> Res<()> {
 
     runtime.block_on(async move {
         let t = ChatAnalyser::default();
-        eframe::run_native(&format!("Chat Analyser {}", env!("CARGO_PKG_VERSION")), options, Box::new(|cc| Box::new(t.init(handle, main_con, cc))));
+        eframe::run_native(&format!("Chat Analyser {}", env!("CARGO_PKG_VERSION")), options, Box::new(|cc| Box::new(t.new(handle, main_con, cc))));
     });
     runtime.shutdown_background();
     log::info!("Goodbye");
