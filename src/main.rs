@@ -11,10 +11,13 @@ use egui::vec2;
 use env_logger::{Builder as env_builder, fmt::Color, WriteStyle};
 use log::{Level, LevelFilter};
 use tokio::runtime::Builder;
+
 use crate::ui::main_ui::ChatAnalyser;
 
 mod config;
 mod ui;
+mod socket;
+mod parse_twitch_data;
 
 type Res<T> = Result<T, Error>;
 

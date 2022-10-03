@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 log = { version = "^0.4.14", features = ["max_level_trace", "release_max_level_trace"] }
-tokio = { version = "^1", features = ["fs", "net", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "^1", features = ["fs", "net", "rt-multi-thread", "sync", "time", "io-util"] }
 tokio-stream = { version = "^0.1.8", features = ["sync"] }
 
 anyhow = "1.0.65"

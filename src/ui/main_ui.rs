@@ -7,7 +7,8 @@ use std::time::Duration;
 use anyhow::Error;
 use dashmap::DashMap;
 use eframe::emath::Align;
-use egui::Widget;
+use egui::{RichText, TextStyle, Widget};
+use egui_dock::{DockArea, NodeIndex, Style, Tree};
 use flume::unbounded;
 use once_cell::sync::Lazy;
 use tokio::runtime::Handle;
@@ -15,7 +16,7 @@ use tokio::task::JoinHandle;
 use tokio::time::sleep as tok_sleep;
 
 use crate::config;
-use crate::config::ConfigFile;
+use crate::socket;
 
 // use crate::modules::extract_tags::extract_tags;
 // use crate::socket;
@@ -43,11 +44,12 @@ pub struct ChatAnalyser {
 
 impl Default for ChatAnalyser {
     fn default() -> Self {
+        let max_history: u16 = 850;
         Self {
             user_input: String::new(),
             thread_comms_1: None,
             thread_comms_2: None,
-            chat_history: VecDeque::with_capacity(850),
+            chat_history: VecDeque::with_capacity(max_history.into()),
             join_chan_win: false,
             settings_win: false,
             run_mode: RunMode::Continuous,
@@ -60,28 +62,34 @@ impl Default for ChatAnalyser {
 }
 
 impl ChatAnalyser {
-    pub fn new(self, rt_handle: Handle, config_file: ConfigFile, cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(self, rt_handle: Handle, config_file: config::ConfigFile, cc: &eframe::CreationContext<'_>) -> Self {
         if config_file.main_win_config.dark_mode {
             cc.egui_ctx.set_visuals(egui::Visuals::dark());
         } else {
             cc.egui_ctx.set_visuals(egui::Visuals::light());
         }
+
+        let rtclone = rt_handle.clone();
         let (t, r) = unbounded();
         let t2 = t.clone();
 
+        // THREADS.lock().unwrap().insert("test".to_owned(), rt_handle.spawn(async move {
+        //     for i in 1..1000 {
+        //         if let Err(e) = t2.try_send(i.to_string()) {
+        //             log::error!("{:?}", e);
+        //         }
+        //         tok_sleep(Duration::from_millis(30)).await;
+        //     }
+        // }));
+
         THREADS.lock().unwrap().insert("test".to_owned(), rt_handle.spawn(async move {
-            for i in 1..10000 {
-                if let Err(e) = t2.try_send(i.to_string()) {
-                    log::error!("{:?}", e);
+            loop {
+                if let Err(e) = socket::Socket::new_socket(t2.clone(), rtclone.clone()).await {
+                    log::error!("OOFUS: {:?}", e);
                 }
-                tok_sleep(Duration::from_millis(30)).await;
+                tok_sleep(Duration::from_secs(1)).await;
             }
         }));
-
-
-        // rt_handle.spawn(async move {
-        //     THREADS.lock().unwrap().get_mut("test").unwrap().value().abort();
-        // });
 
         ChatAnalyser {
             dark_mode: config_file.main_win_config.dark_mode,
@@ -90,25 +98,10 @@ impl ChatAnalyser {
         }
     }
 
-    fn fetch_mes(&mut self) {
-        if let Some(rx) = &self.thread_comms_1 {
-            match rx.1.recv() {
-                Ok(r) => {
-                    self.chat_history.push_back(r);
-                }
-                Err(e) => {
-                    if !e.to_string().to_lowercase().contains("empty") {
-                        log::error!("{:?}", e)
-                    }
-                },
-            }
-        }
-    }
-
     fn render_tabs_header(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("header").resizable(false).show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
-                ui.with_layout(egui::Layout::top_down(Align::LEFT), |ui| {
+                ui.with_layout(egui::Layout::left_to_right(Align::LEFT), |ui| {
                     let theme_button = ui.add(egui::Button::new(if self.dark_mode { "🌙" } else { "☀" } ));
                     let add_channel_button = ui.add(egui::Button::new("➕"));
                     let settings_button = ui.add(egui::Button::new("🛠"));
@@ -153,14 +146,30 @@ impl ChatAnalyser {
     }
 
     fn render_msg(&mut self, ui: &mut egui::Ui) {
-        let mut n = 0;
+        let mut n: u16 = 0;
         for i in &self.chat_history.clone() {
-            ui.add(egui::TextEdit::singleline(&mut self.chat_history.len().to_string()).text_color(if self.dark_mode { egui::Color32::WHITE } else { egui::Color32::BLACK }));
-            if n == 850 {
+            let l = RichText::new(i).text_style(TextStyle::Monospace);
+            ui.add(egui::Label::new(l));
+            if n >= 850 {
                 self.chat_history.pop_front();
-                n = 848;
+                n = 850;
             }
             n += 1;
+        }
+    }
+
+    fn fetch_mes(&mut self) {
+        if let Some(rx) = &self.thread_comms_1 {
+            match rx.1.try_recv() {
+                Ok(r) => {
+                    self.chat_history.push_back(r);
+                }
+                Err(e) => {
+                    if !e.to_string().to_lowercase().contains("empty") {
+                        log::error!("{:?}", e)
+                    }
+                },
+            }
         }
     }
 
@@ -213,8 +222,8 @@ impl eframe::App for ChatAnalyser {
         }
 
         self.render_tabs_header(ctx);
-        self.render_main(ctx);
         self.render_footer(ctx);
+        self.render_main(ctx);
         self.fetch_mes();
 
         if self.join_chan_win {
@@ -233,7 +242,7 @@ impl eframe::App for ChatAnalyser {
 
         match self.run_mode {
             RunMode::Continuous => ctx.request_repaint(),
-            RunMode::Reactive => ctx.request_repaint_after(Duration::from_secs(5)),
+            RunMode::Reactive => return,
         }
     }
 
