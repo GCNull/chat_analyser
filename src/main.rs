@@ -16,10 +16,13 @@ use iced::widget::{Column, Container, Row, Text};
 use log::{Level, LevelFilter};
 use tokio::runtime::Builder;
 
+use structs_enums::*;
+
 mod config;
 mod ui;
 mod socket;
 mod parse_twitch_data;
+mod structs_enums;
 
 type Res<T> = Result<T, Error>;
 
@@ -30,7 +33,6 @@ fn main() -> Res<()> {
 
 #[cfg(target_family = "unix")]
 fn main() -> Res<()> {
-    log::trace!("{}", std::process::id());
     if cfg!(debug_assertions) {
         log::warn!("Running in debug mode! Run in release mode for optimisations!")
     }
@@ -55,16 +57,14 @@ fn main() -> Res<()> {
         .filter_module(env!("CARGO_PKG_NAME"), LevelFilter::Trace)
         .init();
 
-    std::panic::set_hook(Box::new(move |panic| {
-        log::error!("{}", panic);
-    }));
+    log::trace!("{}", std::process::id());
 
     // Create app root and folders it needs
     config::ConfigFile::create_folders();
 
     let main_con = config::ConfigFile::new()?;
 
-    Counter::run(Settings {
+    Tirc::run(Settings {
         window: iced::window::Settings {
             size: (main_con.main_win_config.window_width, main_con.main_win_config.window_height),
             min_size: Some((250, 250)),
@@ -72,20 +72,19 @@ fn main() -> Res<()> {
         },
         ..Default::default()
     }).unwrap();
+
     log::info!("Goodbye");
     Ok(())
 }
 
-struct Counter;
-
-impl Application for Counter {
+impl Application for Tirc {
     type Executor = executor::Default;
-    type Message = Recv;
+    type Message = AppMessages;
     type Theme = Theme;
     type Flags = ();
 
-    fn new(_flags: ()) -> (Counter, Command<Self::Message>) {
-        (Counter, Command::none())
+    fn new(_flags: ()) -> (Tirc, Command<Self::Message>) {
+        (Tirc, Command::none())
     }
 
     fn title(&self) -> String {
@@ -94,8 +93,9 @@ impl Application for Counter {
 
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
-            Recv::Notice => {}
-            Recv::Privmsg => {}
+            AppMessages::ChannelMessage => {}
+            AppMessages::GlobalMessage => {}
+            _ => {}
         }
         Command::none()
     }
@@ -108,14 +108,4 @@ impl Application for Counter {
     fn theme(&self) -> Self::Theme {
         Theme::Dark
     }
-
-    fn should_exit(&self) -> bool {
-        true
-    }
-}
-
-#[derive(Debug)]
-enum Recv {
-    Notice,
-    Privmsg,
 }
