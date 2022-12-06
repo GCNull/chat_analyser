@@ -16,6 +16,8 @@ use tokio_stream::wrappers::BroadcastStream;
 
 use crate::parse_twitch_data::extract_tags;
 
+type Res = Result<(), anyhow::Error>;
+
 static LAST_DATA: Lazy<Mutex<i64>> = Lazy::new(|| {
     Mutex::new(0_i64)
 });
@@ -29,14 +31,14 @@ struct User {
 pub struct Socket;
 
 impl Socket {
-    pub async fn new_socket(sender: flume::Sender<String>, runtime: Handle) -> Result<(), Box<dyn Error + Send + Sync>> {
+    pub async fn new_socket(sender: flume::Sender<String>, runtime: Handle) -> Res {
         log::warn!("Starting new socket connection!");
-        let (send, _recv) = unbounded();
-        let s2 = send.clone();
-        let s3 = send.clone();
+        let (sock_send, _sock_recv) = unbounded();
+        let s2 = sock_send.clone(); // socket recv time
+        let s3 = sock_send.clone(); // ping server
+        let s4 = sock_send.clone(); // ping client
 
         let mut bot_threads: Vec<tokio::task::JoinHandle<_>> = Vec::new();
-        let tx = tokio::sync::broadcast::channel(2048).0; // tx = Twitch PING
 
         // Check last socket recv time
         bot_threads.push(runtime.spawn(async move {
@@ -92,7 +94,7 @@ impl Socket {
                                 // Handle socket input stream
                                 if BufReader::read_line(&mut stream, &mut buff).await? == 0 {
                                     log::warn!("Nothing read on the socket!");
-                                    if let Err(e) = send.send("forced kys".to_string()) {
+                                    if let Err(e) = sock_send.send("forced kys".to_string()) {
                                         log::error!("Failed to send kill command to bots: {}", e);
                                     }
                                     sleep(Duration::from_secs(1)).await;
@@ -105,10 +107,6 @@ impl Socket {
 
                                         if buffer == ":tmi.twitch.tv RECONNECT" {
                                             log::warn!("Twitch has requested that a new connection must be made!");
-                                            if let Err(e) = send.send("forced kys".to_string()) {
-                                                log::error!("Failed to send kill command to bots: {}", e)
-                                            }
-                                            sleep(Duration::from_secs(2)).await;
                                             break
                                         }
                                         // if let Err(e) = ParseTwitchData::parse_twitch_data(buffer.clone()).await {
@@ -136,12 +134,14 @@ impl Socket {
                                             let raw_message = raw_message.replace("  ", " ");
 
 
-                                            if let Err(e) = sender.send(format!("[#moonmoon] [{}:{}]: {}", raw_user, user.user_id, raw_message)) {
+                                            if let Err(e) = sender.send(format!("{} {}: {}", Local::now().format("%T"), raw_user, raw_message)) {
                                                 log::error!("Failed to send buffer to app: {:?}", e);
                                             }
 
                                         }
-                                        if buffer.contains("PING :tmi.twitch.tv") { tx.send("debug PONG :tmi.twitch.tv".to_string())?; }
+                                        if buffer.contains("PING :tmi.twitch.tv") {
+                                            s4.send("debug PONG :tmi.twitch.tv".to_string())?;
+                                        }
                                         buff.clear();
                                     }
                                     if BufReader::read_line(&mut stream, &mut buff).await? == 0 {

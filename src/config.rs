@@ -72,8 +72,8 @@ impl Default for ConfigFile {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MainWindowConfig {
-    pub window_width: f32,
-    pub window_height: f32,
+    pub window_width: u32,
+    pub window_height: u32,
     pub window_position_x: f32,
     pub window_position_y: f32,
     pub dark_mode: bool,
@@ -99,7 +99,7 @@ impl MainWindowConfig {
         }
     }
 
-    pub fn save_window_to_json(window: eframe::WindowInfo, dark_mode: bool) {
+    /*pub fn save_window_to_json(window: eframe::WindowInfo, dark_mode: bool) {
         // Read config file into memery
         match read_to_string(format!("{}config.json", *WORKING_DIR)) {
             Ok(data) => {
@@ -131,13 +131,14 @@ impl MainWindowConfig {
             Err(e) => log::error!("Failed to write window data to config: {}", e),
         }
     }
+     */
 }
 
 impl Default for MainWindowConfig {
     fn default() -> Self {
         Self {
-            window_width: 350.0,
-            window_height: 720.0,
+            window_width: 350,
+            window_height: 720,
             window_position_x: 0.0,
             window_position_y: 0.0,
             dark_mode: true,

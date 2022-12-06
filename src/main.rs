@@ -4,15 +4,17 @@
 
 use std::env;
 use std::io::Write;
+use std::thread::sleep;
+use std::time::Duration;
 
 use anyhow::Error;
 use chrono::Local;
-use egui::vec2;
 use env_logger::{Builder as env_builder, fmt::Color, WriteStyle};
+use iced::{Application, Command, Element, Settings, Theme};
+use iced::executor;
+use iced::widget::{Column, Container, Row, Text};
 use log::{Level, LevelFilter};
 use tokio::runtime::Builder;
-
-use crate::ui::main_ui::ChatAnalyser;
 
 mod config;
 mod ui;
@@ -61,22 +63,59 @@ fn main() -> Res<()> {
     config::ConfigFile::create_folders();
 
     let main_con = config::ConfigFile::new()?;
-    let options = eframe::NativeOptions {
-        initial_window_size: Some(vec2(main_con.main_win_config.window_width, main_con.main_win_config.window_height)),
-        initial_window_pos: Some(egui::Pos2::new(main_con.main_win_config.window_position_x, main_con.main_win_config.window_position_y)),
-        min_window_size: Some(vec2(250.0, 250.0)),
-        decorated: true,
+
+    Counter::run(Settings {
+        window: iced::window::Settings {
+            size: (main_con.main_win_config.window_width, main_con.main_win_config.window_height),
+            min_size: Some((250, 250)),
+            ..Default::default()
+        },
         ..Default::default()
-    };
-
-    let runtime = Builder::new_multi_thread().thread_name("analyser_runtime").enable_all().build().unwrap();
-    let handle = runtime.handle().clone();
-
-    runtime.block_on(async move {
-        let t = ChatAnalyser::default();
-        eframe::run_native(&format!("Chat Analyser {}", env!("CARGO_PKG_VERSION")), options, Box::new(|cc| Box::new(t.new(handle, main_con, cc))));
-    });
-    runtime.shutdown_background();
+    }).unwrap();
     log::info!("Goodbye");
     Ok(())
+}
+
+struct Counter;
+
+impl Application for Counter {
+    type Executor = executor::Default;
+    type Message = Recv;
+    type Theme = Theme;
+    type Flags = ();
+
+    fn new(_flags: ()) -> (Counter, Command<Self::Message>) {
+        (Counter, Command::none())
+    }
+
+    fn title(&self) -> String {
+        format!("TIRC {}", env!("CARGO_PKG_VERSION"))
+    }
+
+    fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
+        match message {
+            Recv::Notice => {}
+            Recv::Privmsg => {}
+        }
+        Command::none()
+    }
+
+    fn view(&self) -> Element<Self::Message> {
+        let row = Row::new();
+        Container::new(row).center_x().center_y().width(iced::Length::Fill).height(iced::Length::Fill).into()
+    }
+
+    fn theme(&self) -> Self::Theme {
+        Theme::Dark
+    }
+
+    fn should_exit(&self) -> bool {
+        true
+    }
+}
+
+#[derive(Debug)]
+enum Recv {
+    Notice,
+    Privmsg,
 }
