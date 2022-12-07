@@ -13,6 +13,7 @@ use env_logger::{Builder as env_builder, fmt::Color, WriteStyle};
 use iced::{Application, Command, Element, Settings, Theme};
 use iced::executor;
 use iced::widget::{Column, Container, Row, Text};
+use iced_native::{Event, Subscription, window};
 use log::{Level, LevelFilter};
 use tokio::runtime::Builder;
 
@@ -32,7 +33,7 @@ fn main() -> Res<()> {
 }
 
 #[cfg(target_family = "unix")]
-fn main() -> Res<()> {
+fn main() {
     if cfg!(debug_assertions) {
         log::warn!("Running in debug mode! Run in release mode for optimisations!")
     }
@@ -55,6 +56,7 @@ fn main() -> Res<()> {
         writeln!(buf, "[{} {}:{}] {}: {}", ts, src_file, record.line().unwrap(), style.value(record.level()), record.args())
     })
         .filter_module(env!("CARGO_PKG_NAME"), LevelFilter::Trace)
+        // .filter_module("iced", LevelFilter::Info)
         .init();
 
     log::trace!("{}", std::process::id());
@@ -62,19 +64,26 @@ fn main() -> Res<()> {
     // Create app root and folders it needs
     config::ConfigFile::create_folders();
 
-    let main_con = config::ConfigFile::new()?;
+    let main_con = config::ConfigFile::new().unwrap();
 
-    Tirc::run(Settings {
+    let res = Tirc::run(Settings {
         window: iced::window::Settings {
             size: (main_con.main_win_config.window_width, main_con.main_win_config.window_height),
             min_size: Some((250, 250)),
             ..Default::default()
         },
+        exit_on_close_request: false,
+        antialiasing: true,
+        text_multithreading: true,
         ..Default::default()
-    }).unwrap();
+    });
 
-    log::info!("Goodbye");
-    Ok(())
+    log::info!("Goodbye {:?}", res);
+}
+
+async fn test() -> () {
+    log::warn!("from test");
+    println!("from test");
 }
 
 impl Application for Tirc {
@@ -84,7 +93,10 @@ impl Application for Tirc {
     type Flags = ();
 
     fn new(_flags: ()) -> (Tirc, Command<Self::Message>) {
-        (Tirc, Command::none())
+
+        (Tirc {
+            should_exit: false
+        }, Command::none())
     }
 
     fn title(&self) -> String {
@@ -93,9 +105,21 @@ impl Application for Tirc {
 
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
-            AppMessages::ChannelMessage => {}
-            AppMessages::GlobalMessage => {}
-            _ => {}
+            AppMessages::RuntimeEvent(event) => {
+
+                match event {
+                    Event::Window(w) => {
+                        dbg!(w);
+                        // if let Event::Window(window::Event::CloseRequested) = event {
+                        //     self.should_exit = true;
+                        // }
+                    }
+                    _ => {}
+                }
+            }
+            _ => {
+                dbg!(message);
+            }
         }
         Command::none()
     }
@@ -107,5 +131,13 @@ impl Application for Tirc {
 
     fn theme(&self) -> Self::Theme {
         Theme::Dark
+    }
+
+    fn subscription(&self) -> Subscription<Self::Message> {
+        iced_native::subscription::events().map(AppMessages::RuntimeEvent)
+    }
+
+    fn should_exit(&self) -> bool {
+        self.should_exit
     }
 }

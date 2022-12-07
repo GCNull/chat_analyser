@@ -60,7 +60,9 @@ impl Default for ConfigFile {
             Ok(default_conf_file) => {
                 if let Err(e) = serde_json::to_writer_pretty(default_conf_file, &default) {
                     panic!("Failed to create config file: {:?}", e);
-                } else { log::info!("Created init config file at {}config.json", *WORKING_DIR); }
+                } else {
+                    log::info!("Created init config file at {}config.json", *WORKING_DIR);
+                }
             }
             Err(e) => panic!("Failed to create config file: {:?}", e),
         }
